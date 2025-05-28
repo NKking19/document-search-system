@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="th">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Document Search Professional - ระบบค้นหาเอกสารองค์กร</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="container">
+            <header class="header">
+                <h1>Document Search Professional</h1>
+                <p>
+                    ระบบค้นหาเอกสารขั้นสูงสำหรับองค์กร - รองรับ PDF, DOC, DOCX,
+                    TXT, RTF
+                </p>
+            </header>
+
+            <main class="main-content">
+                <aside class="left-panel">
+                    <section class="search-section">
+                        <h3>📁 เลือกไฟล์เอกสาร</h3>
+
+                        <div class="file-selection-options">
+                            <button
+                                class="option-button active"
+                                data-option="files"
+                                id="filesOption"
+                            >
+                                📄 เลือกไฟล์
+                            </button>
+                            <button
+                                class="option-button"
+                                data-option="folder"
+                                id="folderOption"
+                            >
+                                📁 เลือกโฟลเดอร์
+                            </button>
+                        </div>
+
+                        <div class="file-input-wrapper">
+                            <input
+                                type="file"
+                                id="fileInput"
+                                class="file-input"
+                                multiple
+                                accept=".pdf,.doc,.docx,.txt,.rtf"
+                            />
+                            <input
+                                type="file"
+                                id="folderInput"
+                                class="folder-input"
+                                webkitdirectory
+                                directory
+                                multiple
+                                style="display: none"
+                            />
+                            <label
+                                for="fileInput"
+                                class="file-input-button"
+                                id="fileInputLabel"
+                            >
+                                📤 เลือกไฟล์เอกสาร
+                            </label>
+                        </div>
+
+                        <div class="management-buttons">
+                            <button
+                                class="manage-btn select-all-btn"
+                                id="selectAllBtn"
+                            >
+                                ✅ เลือกทั้งหมด
+                            </button>
+                            <button
+                                class="manage-btn clear-files-btn"
+                                id="clearFilesBtn"
+                            >
+                                🗑️ ล้างรายการ
+                            </button>
+                        </div>
+
+                        <div class="file-list" id="fileList">
+                            <div class="no-files">
+                                <p>📄 ยังไม่มีไฟล์ที่เลือก</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="search-section">
+                        <h3>🔍 ค้นหาเอกสาร</h3>
+
+                        <textarea
+                            class="search-input"
+                            id="searchInput"
+                            placeholder="พิมพ์คำที่ต้องการค้นหา..."
+                        ></textarea>
+
+                        <div class="search-options">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="caseSensitive" />
+                                <span>ตรงตามตัวพิมพ์ใหญ่-เล็ก</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="wholeWord" />
+                                <span>ค้นหาคำเต็ม</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="useRegex" />
+                                <span>ใช้ Regular Expression</span>
+                            </label>
+                        </div>
+
+                        <div class="search-controls">
+                            <button class="search-button" id="searchButton">
+                                🔍 เริ่มค้นหา
+                            </button>
+                            <button class="cancel-button" id="cancelButton">
+                                ❌ ยกเลิก
+                            </button>
+                        </div>
+
+                        <div class="progress-container" id="progressContainer">
+                            <div class="progress-bar">
+                                <div
+                                    class="progress-fill"
+                                    id="progressFill"
+                                ></div>
+                            </div>
+                            <div class="progress-text" id="progressText">
+                                0%
+                            </div>
+                        </div>
+                    </section>
+                </aside>
+
+                <section class="middle-panel">
+                    <div class="statistics-panel" id="statisticsPanel">
+                        <div class="stat-item">
+                            <span class="stat-number" id="totalFilesCount"
+                                >0</span
+                            >
+                            <span class="stat-label">ไฟล์ทั้งหมด</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="selectedFilesCount"
+                                >0</span
+                            >
+                            <span class="stat-label">ไฟล์ที่เลือก</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="searchResultsCount"
+                                >0</span
+                            >
+                            <span class="stat-label">ผลลัพธ์ที่พบ</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="filesWithMatchesCount"
+                                >0</span
+                            >
+                            <span class="stat-label">ไฟล์ที่มีผลลัพธ์</span>
+                        </div>
+                    </div>
+
+                    <div class="results-container" id="resultsContainer">
+                        <div class="welcome-message">
+                            <div class="welcome-icon">📚</div>
+                            <h3>ยินดีต้อนรับสู่ระบบค้นหาเอกสารองค์กร</h3>
+                            <p>
+                                เลือกไฟล์เอกสารหรือโฟลเดอร์และเริ่มค้นหาข้อมูลที่ต้องการ
+                            </p>
+                            <div class="info-box">
+                                <h4>🔍 วิธีการใช้งาน</h4>
+                                <ol class="usage-steps">
+                                    <li>
+                                        เลือกไฟล์หรือโฟลเดอร์ที่ต้องการค้นหา
+                                    </li>
+                                    <li>ใส่คำค้นหาในช่องค้นหา</li>
+                                    <li>กำหนดตัวเลือกการค้นหาตามต้องการ</li>
+                                    <li>
+                                        คลิก "เริ่มค้นหา" เพื่อเริ่มการค้นหา
+                                    </li>
+                                    <li>คลิกที่ผลลัพธ์เพื่อดูตัวอย่างเอกสาร</li>
+                                </ol>
+                            </div>
+                            <div class="features-grid">
+                                <div class="feature-card">
+                                    <div class="feature-icon">📄</div>
+                                    <h4>รองรับหลายรูปแบบ</h4>
+                                    <p>PDF, DOC, DOCX, TXT, RTF</p>
+                                </div>
+                                <div class="feature-card">
+                                    <div class="feature-icon">⚡</div>
+                                    <h4>ค้นหาเร็ว</h4>
+                                    <p>ประมวลผลหลายไฟล์พร้อมกัน</p>
+                                </div>
+                                <div class="feature-card">
+                                    <div class="feature-icon">📊</div>
+                                    <h4>ส่งออกผลลัพธ์</h4>
+                                    <p>CSV, JSON, PDF Report</p>
+                                </div>
+                                <div class="feature-card">
+                                    <div class="feature-icon">🔒</div>
+                                    <h4>ปลอดภัย</h4>
+                                    <p>ประมวลผลในเครื่องของคุณ</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="export-controls" id="exportControls">
+                        <button class="export-btn" id="exportCsv">
+                            💾 ส่งออก CSV
+                        </button>
+                        <button class="export-btn" id="exportJson">
+                            📄 ส่งออก JSON
+                        </button>
+                        <button class="export-btn" id="exportPdf">
+                            📋 ส่งออก PDF Report
+                        </button>
+                    </div>
+                </section>
+
+                <aside class="right-panel">
+                    <div class="document-viewer" id="documentViewer">
+                        <div class="viewer-placeholder">
+                            <div class="placeholder-icon">👁️</div>
+                            <h4>ตัวอย่างเอกสาร</h4>
+                            <p>คลิกที่ผลการค้นหาเพื่อดูตัวอย่างเอกสาร</p>
+                            <div class="viewer-features">
+                                <div class="viewer-feature">
+                                    <span class="feature-bullet">•</span>
+                                    <span>แสดงตัวอย่าง PDF แบบเต็มรูปแบบ</span>
+                                </div>
+                                <div class="viewer-feature">
+                                    <span class="feature-bullet">•</span>
+                                    <span>ซูมและเลื่อนดูเอกสารได้</span>
+                                </div>
+                                <div class="viewer-feature">
+                                    <span class="feature-bullet">•</span>
+                                    <span>เปิดในแท็บใหม่ได้</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </main>
+        </div>
+
+        <!-- Load Scripts -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+        <script src="app.js"></script>
+    </body>
+</html>
