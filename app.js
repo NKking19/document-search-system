@@ -4,194 +4,178 @@ if (typeof pdfjsLib !== 'undefined') {
 }
 
 /**
- * Document Search Professional - Main Application
+ * Document Search Professional - Working Version
  * ระบบค้นหาเอกสารขั้นสูงสำหรับองค์กร
  */
 class DocumentSearchApp {
     constructor() {
-        this.searchManager = null;
-        this.pdfViewer = null;
-        this.statisticsPanel = null;
-        this.storageManager = new StorageManager();
-        this.documentParsers = new DocumentParsers();
-        
         this.currentFiles = new Map();
         this.selectedFiles = new Set();
         this.searchResults = [];
         this.isSearching = false;
-        this.searchWorker = null;
-        
+        this.currentViewedFile = null;
+        this.currentViewedPage = 1;
+        this.pdfDocument = null;
+        this.currentPage = 1;
+        this.currentScale = 1.0;
+        this.minScale = 0.25;
+        this.maxScale = 5.0;
+        this.scaleStep = 0.5;
         this.init();
     }
 
-    async init() {
-        try {
-            this.initializeComponents();
-            this.bindEvents();
-            this.loadStoredData();
-            
-            console.log('Enhanced Document Search Application initialized successfully');
-        } catch (error) {
-            console.error('Error initializing application:', error);
-            this.showError('เกิดข้อผิดพลาดในการเริ่มต้นโปรแกรม');
-        }
-    }
-
-    initializeComponents() {
-        // Initialize core components
-        this.searchManager = new SearchManager(this);
-        this.pdfViewer = new PDFViewer(this);
-        this.statisticsPanel = new StatisticsPanel(this);
-        
-        // Initialize search worker
-        this.initSearchWorker();
-    }
-
-    initSearchWorker() {
-        try {
-            this.searchWorker = new Worker('workers/document-processor.js');
-            this.searchWorker.onmessage = (event) => {
-                this.handleWorkerMessage(event.data);
-            };
-            this.searchWorker.onerror = (error) => {
-                console.error('Search worker error:', error);
-                this.showError('เกิดข้อผิดพลาดในการประมวลผล');
-            };
-        } catch (error) {
-            console.error('Failed to initialize search worker:', error);
-        }
+    init() {
+        this.bindEvents();
+        this.updateStatistics();
+        console.log('Document Search Professional initialized successfully');
     }
 
     bindEvents() {
-        // File selection events
-        this.bindFileSelectionEvents();
+        // File selection options
+        const filesOption = document.getElementById('filesOption');
+        const folderOption = document.getElementById('folderOption');
         
-        // Search events
-        this.bindSearchEvents();
-        
-        // UI events
-        this.bindUIEvents();
-        
-        // Export events
-        this.bindExportEvents();
-    }
+        if (filesOption) {
+            filesOption.addEventListener('click', () => {
+                this.setFileSelectionMode('files');
+            });
+        }
 
-    bindFileSelectionEvents() {
+        if (folderOption) {
+            folderOption.addEventListener('click', () => {
+                this.setFileSelectionMode('folder');
+            });
+        }
+
+        // File selection
         const fileInput = document.getElementById('fileInput');
         const folderInput = document.getElementById('folderInput');
-        const optionButtons = document.querySelectorAll('.option-button');
+        
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                this.handleFileSelection(e.target.files);
+            });
+        }
+
+        if (folderInput) {
+            folderInput.addEventListener('change', (e) => {
+                this.handleFileSelection(e.target.files);
+            });
+        }
+
+        // File management
         const selectAllBtn = document.getElementById('selectAllBtn');
         const clearFilesBtn = document.getElementById('clearFilesBtn');
-
-        // File input change
-        fileInput.addEventListener('change', (e) => {
-            this.handleFileSelection(e.target.files);
-        });
-
-        folderInput.addEventListener('change', (e) => {
-            this.handleFileSelection(e.target.files);
-        });
-
-        // Option buttons
-        optionButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                this.handleOptionChange(button.dataset.option);
+        
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', () => {
+                this.selectAllFiles();
             });
-        });
+        }
 
-        // File management buttons
-        selectAllBtn.addEventListener('click', () => {
-            this.selectAllFiles();
-        });
+        if (clearFilesBtn) {
+            clearFilesBtn.addEventListener('click', () => {
+                this.clearAllFiles();
+            });
+        }
 
-        clearFilesBtn.addEventListener('click', () => {
-            this.clearAllFiles();
-        });
-    }
-
-    bindSearchEvents() {
+        // Search
         const searchButton = document.getElementById('searchButton');
         const cancelButton = document.getElementById('cancelButton');
-        const searchInput = document.getElementById('searchInput');
-
-        searchButton.addEventListener('click', () => {
-            this.startSearch();
-        });
-
-        cancelButton.addEventListener('click', () => {
-            this.cancelSearch();
-        });
-
-        // Search on Enter key
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.ctrlKey) {
+        
+        if (searchButton) {
+            searchButton.addEventListener('click', () => {
                 this.startSearch();
-            }
-        });
-    }
-
-    bindUIEvents() {
-        // File type filter changes
-        const filterCheckboxes = document.querySelectorAll('[id$="-filter"]');
-        filterCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                this.updateFileTypeFilter();
             });
-        });
+        }
 
-        // Window resize
-        window.addEventListener('resize', () => {
-            this.handleResize();
-        });
+        if (cancelButton) {
+            cancelButton.addEventListener('click', () => {
+                this.cancelSearch();
+            });
+        }
+
+        // Export
+        const exportCsv = document.getElementById('exportCsv');
+        const exportJson = document.getElementById('exportJson');
+        const exportPdf = document.getElementById('exportPdf');
+        
+        if (exportCsv) {
+            exportCsv.addEventListener('click', () => {
+                this.exportResults('csv');
+            });
+        }
+
+        if (exportJson) {
+            exportJson.addEventListener('click', () => {
+                this.exportResults('json');
+            });
+        }
+
+        if (exportPdf) {
+            exportPdf.addEventListener('click', () => {
+                this.exportResults('pdf');
+            });
+        }
+
+        // Enter key search
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    this.startSearch();
+                }
+            });
+        }
     }
 
-    bindExportEvents() {
-        const exportCsvBtn = document.getElementById('exportCsv');
-        const exportJsonBtn = document.getElementById('exportJson');
-        const exportPdfBtn = document.getElementById('exportPdf');
+    setFileSelectionMode(mode) {
+        const filesOption = document.getElementById('filesOption');
+        const folderOption = document.getElementById('folderOption');
+        const fileInput = document.getElementById('fileInput');
+        const folderInput = document.getElementById('folderInput');
+        const fileInputLabel = document.getElementById('fileInputLabel');
 
-        exportCsvBtn.addEventListener('click', () => {
-            this.exportResults('csv');
-        });
+        if (!filesOption || !folderOption || !fileInput || !folderInput || !fileInputLabel) {
+            return;
+        }
 
-        exportJsonBtn.addEventListener('click', () => {
-            this.exportResults('json');
-        });
-
-        exportPdfBtn.addEventListener('click', () => {
-            this.exportResults('pdf');
-        });
+        if (mode === 'files') {
+            filesOption.classList.add('active');
+            folderOption.classList.remove('active');
+            fileInput.style.display = 'block';
+            folderInput.style.display = 'none';
+            fileInputLabel.setAttribute('for', 'fileInput');
+            fileInputLabel.innerHTML = '📤 เลือกไฟล์เอกสาร';
+        } else {
+            filesOption.classList.remove('active');
+            folderOption.classList.add('active');
+            fileInput.style.display = 'none';
+            folderInput.style.display = 'block';
+            fileInputLabel.setAttribute('for', 'folderInput');
+            fileInputLabel.innerHTML = '📁 เลือกโฟลเดอร์';
+        }
     }
 
     async handleFileSelection(files) {
+        if (!files || files.length === 0) {
+            return;
+        }
+
         const fileArray = Array.from(files);
         const supportedFiles = this.filterSupportedFiles(fileArray);
         
         if (supportedFiles.length === 0) {
-            this.showError('ไม่พบไฟล์ที่รองรับ กรุณาเลือกไฟล์ PDF, DOC, DOCX, TXT หรือ RTF');
+            alert('ไม่พบไฟล์ที่รองรับ กรุณาเลือกไฟล์ PDF, DOC, DOCX, TXT หรือ RTF');
             return;
         }
 
-        try {
-            this.showProgress(true, 'กำลังโหลดไฟล์...');
-            
-            for (let i = 0; i < supportedFiles.length; i++) {
-                const file = supportedFiles[i];
-                await this.addFileToList(file);
-                
-                const progress = ((i + 1) / supportedFiles.length) * 100;
-                this.updateProgress(progress, `โหลดไฟล์ ${i + 1}/${supportedFiles.length}`);
-            }
-            
-            this.updateFileList();
-            this.updateStatistics();
-            
-        } catch (error) {
-            console.error('Error handling file selection:', error);
-            this.showError('เกิดข้อผิดพลาดในการโหลดไฟล์');
-        } finally {
-            this.showProgress(false);
+        for (const file of supportedFiles) {
+            await this.addFileToList(file);
         }
+        
+        this.updateFileList();
+        this.updateStatistics();
     }
 
     filterSupportedFiles(files) {
@@ -206,7 +190,7 @@ class DocumentSearchApp {
         const fileId = this.generateFileId(file);
         
         if (this.currentFiles.has(fileId)) {
-            return; // File already exists
+            return;
         }
 
         const fileInfo = {
@@ -215,7 +199,6 @@ class DocumentSearchApp {
             name: file.name,
             size: file.size,
             type: this.getFileType(file.name),
-            lastModified: file.lastModified,
             selected: true
         };
 
@@ -242,14 +225,10 @@ class DocumentSearchApp {
     updateFileList() {
         const fileList = document.getElementById('fileList');
         
+        if (!fileList) return;
+
         if (this.currentFiles.size === 0) {
-            fileList.innerHTML = `
-                <div class="no-files">
-                    <i data-feather="file-text" class="no-files-icon"></i>
-                    <p>ยังไม่มีไฟล์ที่เลือก</p>
-                </div>
-            `;
-            feather.replace();
+            fileList.innerHTML = '<div class="no-files"><p>📄 ยังไม่มีไฟล์ที่เลือก</p></div>';
             return;
         }
 
@@ -263,7 +242,7 @@ class DocumentSearchApp {
                     <input type="checkbox" class="file-checkbox" ${isSelected ? 'checked' : ''}>
                     <div class="file-info">
                         <div class="file-name">${fileInfo.name}</div>
-                        <div class="file-details">${fileSize}</div>
+                        <div class="file-size">${fileSize}</div>
                     </div>
                     <span class="file-type-badge ${fileInfo.type}">${fileInfo.type.toUpperCase()}</span>
                 </div>
@@ -271,10 +250,7 @@ class DocumentSearchApp {
         });
 
         fileList.innerHTML = html;
-        
-        // Bind file item events
         this.bindFileItemEvents();
-        feather.replace();
     }
 
     bindFileItemEvents() {
@@ -284,15 +260,15 @@ class DocumentSearchApp {
             const checkbox = item.querySelector('.file-checkbox');
             const fileId = item.dataset.fileId;
             
-            // Checkbox change
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                this.toggleFileSelection(fileId, checkbox.checked);
-            });
+            if (checkbox) {
+                checkbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    this.toggleFileSelection(fileId, checkbox.checked);
+                });
+            }
             
-            // Item click
             item.addEventListener('click', (e) => {
-                if (e.target.type !== 'checkbox') {
+                if (e.target.type !== 'checkbox' && checkbox) {
                     checkbox.checked = !checkbox.checked;
                     this.toggleFileSelection(fileId, checkbox.checked);
                 }
@@ -330,62 +306,85 @@ class DocumentSearchApp {
         }
     }
 
-    handleOptionChange(option) {
-        const optionButtons = document.querySelectorAll('.option-button');
-        const fileInput = document.getElementById('fileInput');
-        const folderInput = document.getElementById('folderInput');
-        const fileInputLabel = document.getElementById('fileInputLabel');
-
-        optionButtons.forEach(btn => btn.classList.remove('active'));
-        document.querySelector(`[data-option="${option}"]`).classList.add('active');
-
-        if (option === 'files') {
-            fileInput.style.display = 'block';
-            folderInput.style.display = 'none';
-            fileInputLabel.setAttribute('for', 'fileInput');
-            fileInputLabel.innerHTML = '<i data-feather="upload"></i> เลือกไฟล์เอกสาร';
-        } else {
-            fileInput.style.display = 'none';
-            folderInput.style.display = 'block';
-            fileInputLabel.setAttribute('for', 'folderInput');
-            fileInputLabel.innerHTML = '<i data-feather="folder"></i> เลือกโฟลเดอร์';
-        }
-        
-        feather.replace();
-    }
-
     async startSearch() {
-        const searchQuery = document.getElementById('searchInput').value.trim();
+        const searchInput = document.getElementById('searchInput');
+        if (!searchInput) return;
+
+        const searchQuery = searchInput.value.trim();
         
         if (!searchQuery) {
-            this.showError('กรุณาใส่คำที่ต้องการค้นหา');
+            alert('กรุณาใส่คำที่ต้องการค้นหา');
             return;
         }
 
         if (this.selectedFiles.size === 0) {
-            this.showError('กรุณาเลือกไฟล์ที่ต้องการค้นหา');
+            alert('กรุณาเลือกไฟล์ที่ต้องการค้นหา');
             return;
         }
 
-        // Use the search manager to handle the search
-        if (this.searchManager) {
-            await this.searchManager.startSearch(searchQuery, this.getSearchOptions(), this.selectedFiles);
+        this.isSearching = true;
+        this.updateSearchUI(true);
+        this.clearResults();
+        this.searchResults = [];
+
+        const searchOptions = this.getSearchOptions();
+        const selectedFileInfos = Array.from(this.selectedFiles).map(id => this.currentFiles.get(id));
+        
+        try {
+            for (let i = 0; i < selectedFileInfos.length && this.isSearching; i++) {
+                const fileInfo = selectedFileInfos[i];
+                
+                this.updateProgress(
+                    (i / selectedFileInfos.length) * 100,
+                    `กำลังประมวลผล: ${fileInfo.name}`
+                );
+                
+                const content = await this.extractFileContent(fileInfo.file);
+                
+                if (this.isSearching) {
+                    const results = this.searchInContent(content, searchQuery, searchOptions, fileInfo.name);
+                    
+                    results.forEach(result => {
+                        this.searchResults.push({
+                            fileId: fileInfo.id,
+                            fileName: fileInfo.name,
+                            pageNumber: result.pageNumber,
+                            content: result.content,
+                            matches: result.matches,
+                            file: fileInfo.file
+                        });
+                    });
+                    
+                    this.displaySearchResults();
+                    this.updateStatistics();
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 30));
+            }
+            
+            if (this.isSearching) {
+                this.completeSearch();
+            }
+            
+        } catch (error) {
+            console.error('Search error:', error);
+            alert('เกิดข้อผิดพลาดในการค้นหา');
+            this.updateSearchUI(false);
         }
     }
 
     async extractFileContent(file) {
+        const fileType = this.getFileType(file.name);
+        
         try {
-            const fileType = this.getFileType(file.name);
-            
             switch (fileType) {
                 case 'pdf':
-                    return await this.documentParsers.parsePDF(file);
+                    return await this.parsePDF(file);
                 case 'doc':
-                    return await this.documentParsers.parseWord(file);
+                    return await this.parseWord(file);
                 case 'txt':
-                    return await this.documentParsers.parseText(file);
                 case 'rtf':
-                    return await this.documentParsers.parseRTF(file);
+                    return await this.parseText(file);
                 default:
                     throw new Error(`Unsupported file type: ${fileType}`);
             }
@@ -395,54 +394,263 @@ class DocumentSearchApp {
         }
     }
 
-    handleWorkerMessage(data) {
-        switch (data.type) {
-            case 'searchResult':
-                this.addSearchResult(data.result);
-                break;
-            case 'searchComplete':
-                this.handleSearchComplete();
-                break;
-            case 'error':
-                console.error('Worker error:', data.error);
-                this.showError('เกิดข้อผิดพลาดในการค้นหา');
-                this.updateSearchUI(false);
-                break;
+    async parsePDF(file) {
+        try {
+            const arrayBuffer = await this.fileToArrayBuffer(file);
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const pages = [];
+            
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                try {
+                    const page = await pdf.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    
+                    const pageText = textContent.items
+                        .map(item => item.str)
+                        .join(' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    
+                    pages.push({
+                        pageNumber: pageNum,
+                        content: pageText
+                    });
+                } catch (pageError) {
+                    console.warn(`Error parsing PDF page ${pageNum}:`, pageError);
+                }
+            }
+            
+            return { pages };
+        } catch (error) {
+            throw new Error(`Failed to parse PDF: ${error.message}`);
         }
     }
 
-    addSearchResult(result) {
-        this.searchResults.push(result);
-        this.displaySearchResults();
-        this.updateStatistics();
+    async parseWord(file) {
+        try {
+            if (typeof mammoth === 'undefined') {
+                throw new Error('Mammoth library not loaded');
+            }
+            const arrayBuffer = await this.fileToArrayBuffer(file);
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            
+            const pages = this.splitIntoPages(result.value, 2000);
+            return { pages };
+        } catch (error) {
+            throw new Error(`Failed to parse Word document: ${error.message}`);
+        }
     }
 
-    handleSearchComplete() {
-        this.updateSearchUI(false);
-        this.updateStatistics();
+    async parseText(file) {
+        try {
+            const text = await this.fileToText(file);
+            const pages = this.splitIntoPages(text, 3000);
+            return { pages };
+        } catch (error) {
+            throw new Error(`Failed to parse text file: ${error.message}`);
+        }
+    }
+
+    splitIntoPages(content, charsPerPage = 2000) {
+        if (!content || content.trim().length === 0) {
+            return [{ pageNumber: 1, content: '' }];
+        }
+
+        const pages = [];
+        let currentPage = 1;
+        let currentPos = 0;
         
-        if (this.searchResults.length === 0) {
-            this.showNoResults();
-        } else {
-            this.showExportControls(true);
+        while (currentPos < content.length) {
+            let endPos = currentPos + charsPerPage;
+            
+            if (endPos < content.length) {
+                const nextSpace = content.indexOf(' ', endPos);
+                const nextNewline = content.indexOf('\n', endPos);
+                
+                if (nextSpace !== -1 && (nextNewline === -1 || nextSpace < nextNewline)) {
+                    endPos = nextSpace;
+                } else if (nextNewline !== -1) {
+                    endPos = nextNewline;
+                }
+            }
+            
+            const pageContent = content.substring(currentPos, endPos).trim();
+            
+            if (pageContent.length > 0) {
+                pages.push({
+                    pageNumber: currentPage,
+                    content: pageContent
+                });
+            }
+            
+            currentPos = endPos + 1;
+            currentPage++;
+        }
+        
+        if (pages.length === 0) {
+            pages.push({
+                pageNumber: 1,
+                content: content.trim()
+            });
+        }
+        
+        return pages;
+    }
+
+    fileToArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target.result);
+            reader.onerror = (error) => reject(error);
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    fileToText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target.result);
+            reader.onerror = (error) => reject(error);
+            reader.readAsText(file, 'UTF-8');
+        });
+    }
+
+    searchInContent(documentContent, query, options, fileName) {
+        const results = [];
+        
+        if (!documentContent.pages || !Array.isArray(documentContent.pages)) {
+            return results;
+        }
+
+        const searchRegex = this.buildSearchRegex(query, options);
+
+        documentContent.pages.forEach(page => {
+            const matches = this.findMatches(page.content, searchRegex);
+            
+            if (matches.length > 0) {
+                const contexts = this.extractContexts(page.content, matches);
+                
+                contexts.forEach(context => {
+                    results.push({
+                        pageNumber: page.pageNumber,
+                        content: context.text,
+                        matches: context.matches
+                    });
+                });
+            }
+        });
+
+        return results;
+    }
+
+    buildSearchRegex(query, options) {
+        let pattern = query;
+        
+        if (!options.useRegex) {
+            pattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+        
+        if (options.wholeWord) {
+            pattern = `\\b${pattern}\\b`;
+        }
+        
+        const flags = options.caseSensitive ? 'g' : 'gi';
+        
+        try {
+            return new RegExp(pattern, flags);
+        } catch (error) {
+            const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return new RegExp(escapedQuery, flags);
         }
     }
 
-    cancelSearch() {
-        if (this.searchManager) {
-            this.searchManager.cancelSearch();
+    findMatches(content, regex) {
+        const matches = [];
+        let match;
+        
+        regex.lastIndex = 0;
+        
+        while ((match = regex.exec(content)) !== null) {
+            matches.push({
+                index: match.index,
+                length: match[0].length,
+                text: match[0]
+            });
+            
+            if (match.index === regex.lastIndex) {
+                regex.lastIndex++;
+            }
         }
         
-        this.isSearching = false;
-        this.updateSearchUI(false);
-        this.showProgress(false);
+        return matches;
+    }
+
+    extractContexts(content, matches) {
+        const contexts = [];
+        const contextRadius = 150;
+        
+        const groups = this.groupMatches(matches, contextRadius * 2);
+        
+        groups.forEach(group => {
+            const firstMatch = group[0];
+            const lastMatch = group[group.length - 1];
+            
+            const start = Math.max(0, firstMatch.index - contextRadius);
+            const end = Math.min(content.length, lastMatch.index + lastMatch.length + contextRadius);
+            
+            const contextText = content.substring(start, end);
+            
+            const adjustedMatches = group.map(match => ({
+                index: match.index - start,
+                length: match.length,
+                text: match.text
+            }));
+            
+            contexts.push({
+                text: this.cleanContext(contextText),
+                matches: adjustedMatches
+            });
+        });
+
+        return contexts;
+    }
+
+    groupMatches(matches, maxDistance) {
+        if (matches.length === 0) return [];
+        
+        const groups = [];
+        let currentGroup = [matches[0]];
+        
+        for (let i = 1; i < matches.length; i++) {
+            const currentMatch = matches[i];
+            const lastMatch = currentGroup[currentGroup.length - 1];
+            
+            const distance = currentMatch.index - (lastMatch.index + lastMatch.length);
+            
+            if (distance <= maxDistance) {
+                currentGroup.push(currentMatch);
+            } else {
+                groups.push(currentGroup);
+                currentGroup = [currentMatch];
+            }
+        }
+        
+        groups.push(currentGroup);
+        return groups;
+    }
+
+    cleanContext(text) {
+        return text
+            .replace(/\s+/g, ' ')
+            .replace(/\n\s*\n/g, '\n')
+            .trim();
     }
 
     getSearchOptions() {
         return {
-            caseSensitive: document.getElementById('caseSensitive').checked,
-            wholeWord: document.getElementById('wholeWord').checked,
-            useRegex: document.getElementById('useRegex').checked
+            caseSensitive: document.getElementById('caseSensitive')?.checked || false,
+            wholeWord: document.getElementById('wholeWord')?.checked || false,
+            useRegex: document.getElementById('useRegex')?.checked || false
         };
     }
 
@@ -450,23 +658,32 @@ class DocumentSearchApp {
         const searchButton = document.getElementById('searchButton');
         const cancelButton = document.getElementById('cancelButton');
         const searchInput = document.getElementById('searchInput');
+        const progressContainer = document.getElementById('progressContainer');
         
-        searchButton.disabled = searching;
-        searchInput.disabled = searching;
+        if (searchButton) searchButton.disabled = searching;
+        if (searchInput) searchInput.disabled = searching;
         
         if (searching) {
-            cancelButton.style.display = 'flex';
-            this.showProgress(true, 'กำลังค้นหา...');
+            if (cancelButton) cancelButton.style.display = 'block';
+            if (progressContainer) progressContainer.style.display = 'block';
         } else {
-            cancelButton.style.display = 'none';
-            this.showProgress(false);
+            if (cancelButton) cancelButton.style.display = 'none';
+            if (progressContainer) progressContainer.style.display = 'none';
         }
+    }
+
+    updateProgress(percentage, message = '') {
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        
+        if (progressFill) progressFill.style.width = percentage + '%';
+        if (progressText) progressText.textContent = message || `${Math.round(percentage)}%`;
     }
 
     displaySearchResults() {
         const resultsContainer = document.getElementById('resultsContainer');
         
-        if (this.searchResults.length === 0) {
+        if (!resultsContainer || this.searchResults.length === 0) {
             return;
         }
 
@@ -485,15 +702,15 @@ class DocumentSearchApp {
         return `
             <div class="result-item" data-result-index="${index}">
                 <div class="result-header" onclick="app.viewDocument(${index})">
-                    <div class="file-name-result">
-                        <i data-feather="file-text"></i>
-                        ${result.fileName}
+                    <div class="file-name-result">📄 ${result.fileName}</div>
+                    <div>
+                        <span class="page-number">หน้า ${result.pageNumber}</span>
+                        <button class="new-tab-btn" onclick="event.stopPropagation(); app.openFileInNewTab(${index})">
+                            🔗 New Tab
+                        </button>
                     </div>
-                    <div class="page-number">หน้า ${result.pageNumber}</div>
                 </div>
-                <div class="page-content">
-                    ${highlightedContent}
-                </div>
+                <div class="page-content">${highlightedContent}</div>
             </div>
         `;
     }
@@ -504,8 +721,6 @@ class DocumentSearchApp {
         }
 
         let highlightedContent = content;
-        
-        // Sort matches by index in descending order to avoid position shifts
         const sortedMatches = matches.sort((a, b) => b.index - a.index);
         
         sortedMatches.forEach(match => {
@@ -520,115 +735,188 @@ class DocumentSearchApp {
     }
 
     bindResultEvents() {
-        feather.replace();
+        // Results are bound in createResultHTML via onclick
     }
 
-    async viewDocument(resultIndex) {
+    viewDocument(resultIndex) {
         const result = this.searchResults[resultIndex];
         if (!result) return;
 
-        const fileInfo = this.currentFiles.get(result.fileId);
-        if (!fileInfo) return;
+        this.currentViewedFile = result.file;
+        this.currentViewedPage = result.pageNumber;
+        this.showDocumentContent(result);
+    }
 
-        try {
-            if (fileInfo.type === 'pdf') {
-                await this.pdfViewer.loadPDF(fileInfo.file, result.pageNumber);
-            } else {
-                this.showDocumentContent(result);
-            }
-        } catch (error) {
-            console.error('Error viewing document:', error);
-            this.showError('เกิดข้อผิดพลาดในการแสดงเอกสาร');
+    openFileInNewTab(resultIndex) {
+        const result = this.searchResults[resultIndex];
+        if (!result || !result.file) return;
+
+        const fileURL = URL.createObjectURL(result.file);
+        
+        let finalURL = fileURL;
+        if (this.getFileType(result.file.name) === 'pdf') {
+            finalURL = `${fileURL}#page=${result.pageNumber}`;
+        }
+        
+        const newWindow = window.open(finalURL, '_blank');
+        
+        if (newWindow) {
+            newWindow.focus();
+            setTimeout(() => {
+                URL.revokeObjectURL(fileURL);
+            }, 2000);
+        } else {
+            alert('กรุณาอนุญาตให้เปิดหน้าต่างใหม่ในเบราว์เซอร์');
         }
     }
 
     showDocumentContent(result) {
         const documentViewer = document.getElementById('documentViewer');
         
+        if (!documentViewer) return;
+
         documentViewer.innerHTML = `
-            <div class="document-content-viewer">
-                <div class="document-header">
-                    <h4>${result.fileName} - หน้า ${result.pageNumber}</h4>
-                    <button class="close-btn" onclick="app.closeDocumentViewer()">
-                        <i data-feather="x"></i>
-                    </button>
+            <div class="document-content-viewer" style="height: 100%; overflow-y: auto; padding: 15px; background: white;">
+                <div style="border-bottom: 2px solid #3498db; padding-bottom: 12px; margin-bottom: 15px;">
+                    <h4 style="color: #2c3e50; margin-bottom: 5px; font-size: 0.9rem;">📄 ${result.fileName}</h4>
+                    <p style="color: #7f8c8d; font-size: 0.8rem;">หน้า ${result.pageNumber}</p>
+                    <button onclick="app.closeDocumentViewer()" style="float: right; background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem;">❌ ปิด</button>
+                    <button onclick="app.openFileInNewTab(${this.searchResults.indexOf(result)})" style="float: right; background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; margin-right: 6px; font-size: 0.8rem;">🔗 New Tab</button>
                 </div>
-                <div class="document-text">
+                <div style="line-height: 1.6; color: #2c3e50; font-size: 0.85rem;">
                     ${this.highlightSearchTerms(result.content, result.matches)}
                 </div>
             </div>
         `;
-        
-        feather.replace();
     }
 
     closeDocumentViewer() {
         const documentViewer = document.getElementById('documentViewer');
+        if (!documentViewer) return;
+
         documentViewer.innerHTML = `
             <div class="viewer-placeholder">
-                <div class="placeholder-icon">
-                    <i data-feather="eye"></i>
-                </div>
+                <div class="placeholder-icon">👁️</div>
                 <h4>ตัวอย่างเอกสาร</h4>
                 <p>คลิกที่ผลการค้นหาเพื่อดูตัวอย่างเอกสาร</p>
+                <div class="viewer-features">
+                    <div class="viewer-feature">
+                        <span class="feature-bullet">•</span>
+                        <span>แสดงตัวอย่าง PDF แบบเต็มรูปแบบ</span>
+                    </div>
+                    <div class="viewer-feature">
+                        <span class="feature-bullet">•</span>
+                        <span>ซูมและเลื่อนดูเอกสารได้</span>
+                    </div>
+                    <div class="viewer-feature">
+                        <span class="feature-bullet">•</span>
+                        <span>เปิดในแท็บใหม่ได้</span>
+                    </div>
+                </div>
             </div>
         `;
-        feather.replace();
+    }
+
+    completeSearch() {
+        this.isSearching = false;
+        this.updateSearchUI(false);
+        this.updateProgress(100, 'การค้นหาเสร็จสิ้น');
+        
+        if (this.searchResults.length === 0) {
+            this.showNoResults();
+        } else {
+            this.showExportControls(true);
+            alert(`พบผลการค้นหา ${this.searchResults.length} รายการ`);
+        }
+    }
+
+    cancelSearch() {
+        this.isSearching = false;
+        this.updateSearchUI(false);
+        alert('ยกเลิกการค้นหาแล้ว');
     }
 
     showNoResults() {
         const resultsContainer = document.getElementById('resultsContainer');
+        if (!resultsContainer) return;
+
         resultsContainer.innerHTML = `
             <div class="no-results">
-                <div class="no-results-icon">
-                    <i data-feather="search"></i>
-                </div>
-                <h3>ไม่พบผลการค้นหา</h3>
+                <h3>🔍 ไม่พบผลการค้นหา</h3>
                 <p>ลองเปลี่ยนคำค้นหาหรือตัวเลือกการค้นหา</p>
             </div>
         `;
-        feather.replace();
     }
 
     clearResults() {
         const resultsContainer = document.getElementById('resultsContainer');
+        if (!resultsContainer) return;
+
         resultsContainer.innerHTML = `
             <div class="welcome-message">
-                <div class="welcome-icon">
-                    <i data-feather="file-text"></i>
+                <div class="welcome-icon">📚</div>
+                <h3>ยินดีต้อนรับสู่ระบบค้นหาเอกสารองค์กร</h3>
+                <p>เลือกไฟล์เอกสารหรือโฟลเดอร์และเริ่มค้นหาข้อมูลที่ต้องการ</p>
+                <div class="info-box">
+                    <h4>🔍 วิธีการใช้งาน</h4>
+                    <ol class="usage-steps">
+                        <li>เลือกไฟล์หรือโฟลเดอร์ที่ต้องการค้นหา</li>
+                        <li>ใส่คำค้นหาในช่องค้นหา</li>
+                        <li>กำหนดตัวเลือกการค้นหาตามต้องการ</li>
+                        <li>คลิก "เริ่มค้นหา" เพื่อเริ่มการค้นหา</li>
+                        <li>คลิกที่ผลลัพธ์เพื่อดูตัวอย่างเอกสาร</li>
+                    </ol>
                 </div>
-                <h3>ยินดีต้อนรับสู่ Enhanced Document Search</h3>
-                <p>เลือกไฟล์เอกสารและเริ่มค้นหาข้อมูลที่ต้องการ</p>
-                <ul class="feature-list">
-                    <li><i data-feather="check"></i> รองรับ PDF, DOC, DOCX, TXT, RTF</li>
-                    <li><i data-feather="check"></i> ค้นหาแบบขั้นสูงด้วย Regular Expression</li>
-                    <li><i data-feather="check"></i> ส่งออกผลการค้นหา</li>
-                    <li><i data-feather="check"></i> จัดการประวัติการค้นหา</li>
-                </ul>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">📄</div>
+                        <h4>รองรับหลายรูปแบบ</h4>
+                        <p>PDF, DOC, DOCX, TXT, RTF</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h4>ค้นหาเร็ว</h4>
+                        <p>ประมวลผลหลายไฟล์พร้อมกัน</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h4>ส่งออกผลลัพธ์</h4>
+                        <p>CSV, JSON, PDF Report</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔒</div>
+                        <h4>ปลอดภัย</h4>
+                        <p>ประมวลผลในเครื่องของคุณ</p>
+                    </div>
+                </div>
             </div>
         `;
-        feather.replace();
     }
 
     updateStatistics() {
-        if (this.statisticsPanel) {
-            this.statisticsPanel.updateStats({
-                totalFiles: this.currentFiles.size,
-                selectedFiles: this.selectedFiles.size,
-                searchResults: this.searchResults.length,
-                isSearching: this.isSearching
-            });
-        }
+        const totalFilesCount = document.getElementById('totalFilesCount');
+        const selectedFilesCount = document.getElementById('selectedFilesCount');
+        const searchResultsCount = document.getElementById('searchResultsCount');
+        const filesWithMatchesCount = document.getElementById('filesWithMatchesCount');
+
+        if (totalFilesCount) totalFilesCount.textContent = this.currentFiles.size;
+        if (selectedFilesCount) selectedFilesCount.textContent = this.selectedFiles.size;
+        if (searchResultsCount) searchResultsCount.textContent = this.searchResults.length;
+        
+        const filesWithMatches = new Set(this.searchResults.map(result => result.fileId)).size;
+        if (filesWithMatchesCount) filesWithMatchesCount.textContent = filesWithMatches;
     }
 
     showExportControls(show) {
         const exportControls = document.getElementById('exportControls');
-        exportControls.style.display = show ? 'flex' : 'none';
+        if (exportControls) {
+            exportControls.style.display = show ? 'flex' : 'none';
+        }
     }
 
-    async exportResults(format) {
+    exportResults(format) {
         if (this.searchResults.length === 0) {
-            this.showError('ไม่มีผลการค้นหาที่จะส่งออก');
+            alert('ไม่มีผลการค้นหาที่จะส่งออก');
             return;
         }
 
@@ -647,14 +935,15 @@ class DocumentSearchApp {
                     this.exportToPDF(filename);
                     break;
             }
-            this.showSuccess(`ส่งออกผลการค้นหาเป็น ${format.toUpperCase()} เรียบร้อยแล้ว`);
+            alert(`ส่งออกผลการค้นหาเป็น ${format.toUpperCase()} เรียบร้อยแล้ว`);
         } catch (error) {
             console.error('Export error:', error);
-            this.showError('เกิดข้อผิดพลาดในการส่งออก');
+            alert('เกิดข้อผิดพลาดในการส่งออก');
         }
     }
 
     exportToCSV(filename) {
+        const searchInput = document.getElementById('searchInput');
         const headers = ['ชื่อไฟล์', 'หน้า', 'เนื้อหา', 'จำนวนที่พบ'];
         const rows = this.searchResults.map(result => [
             result.fileName,
@@ -667,36 +956,30 @@ class DocumentSearchApp {
             .map(row => row.map(field => `"${field}"`).join(','))
             .join('\n');
 
-        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${filename}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+        this.downloadFile('\uFEFF' + csvContent, `${filename}.csv`, 'text/csv;charset=utf-8;');
     }
 
     exportToJSON(filename) {
+        const searchInput = document.getElementById('searchInput');
         const exportData = {
-            searchQuery: document.getElementById('searchInput').value,
+            searchQuery: searchInput ? searchInput.value : '',
             searchDate: new Date().toISOString(),
             totalResults: this.searchResults.length,
-            results: this.searchResults
+            results: this.searchResults.map(result => ({
+                fileName: result.fileName,
+                pageNumber: result.pageNumber,
+                content: result.content,
+                matchCount: result.matches.length
+            }))
         };
 
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${filename}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        this.downloadFile(JSON.stringify(exportData, null, 2), `${filename}.json`, 'application/json');
     }
 
     exportToPDF(filename) {
-        // Create a simple PDF report using HTML and print functionality
+        const searchInput = document.getElementById('searchInput');
         const printWindow = window.open('', '_blank');
-        const searchQuery = document.getElementById('searchInput').value;
+        const searchQuery = searchInput ? searchInput.value : '';
         
         const htmlContent = `
             <!DOCTYPE html>
@@ -734,103 +1017,14 @@ class DocumentSearchApp {
         printWindow.print();
     }
 
-    updateSearchHistory() {
-        const historyContainer = document.getElementById('searchHistory');
-        const history = this.storageManager.getSearchHistory();
-        
-        if (history.length === 0) {
-            historyContainer.innerHTML = `
-                <div class="no-history">
-                    <p>ยังไม่มีประวัติการค้นหา</p>
-                </div>
-            `;
-            return;
-        }
-
-        let html = '';
-        history.slice(0, 10).forEach((item, index) => {
-            html += `
-                <div class="history-item" onclick="app.useSearchHistory(${index})">
-                    <div class="history-query">${item.query}</div>
-                    <div class="history-meta">${new Date(item.timestamp).toLocaleString('th-TH')}</div>
-                </div>
-            `;
-        });
-
-        historyContainer.innerHTML = html;
-    }
-
-    useSearchHistory(index) {
-        const history = this.storageManager.getSearchHistory();
-        const item = history[index];
-        
-        if (item) {
-            document.getElementById('searchInput').value = item.query;
-            
-            // Apply search options
-            if (item.options) {
-                document.getElementById('caseSensitive').checked = item.options.caseSensitive || false;
-                document.getElementById('wholeWord').checked = item.options.wholeWord || false;
-                document.getElementById('useRegex').checked = item.options.useRegex || false;
-            }
-        }
-    }
-
-    loadStoredData() {
-        try {
-            // Load search history
-            this.updateSearchHistory();
-            
-            // Load and apply preferences
-            const preferences = this.storageManager.getPreferences();
-            if (preferences.defaultSearchOptions) {
-                const options = preferences.defaultSearchOptions;
-                document.getElementById('caseSensitive').checked = options.caseSensitive || false;
-                document.getElementById('wholeWord').checked = options.wholeWord || false;
-                document.getElementById('useRegex').checked = options.useRegex || false;
-            }
-        } catch (error) {
-            console.error('Error loading stored data:', error);
-        }
-    }
-
-    showProgress(show, message = '') {
-        const progressContainer = document.querySelector('.progress-container');
-        const progressText = document.getElementById('progressText');
-        
-        if (show) {
-            progressContainer.style.display = 'block';
-            if (message) {
-                progressText.textContent = message;
-            }
-        } else {
-            progressContainer.style.display = 'none';
-        }
-    }
-
-    updateProgress(percentage, message = '') {
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
-        
-        if (progressFill) {
-            progressFill.style.width = percentage + '%';
-        }
-        
-        if (progressText && message) {
-            progressText.textContent = message;
-        }
-    }
-
-    updateFileTypeFilter() {
-        // This method can be implemented to filter file list by type
-        this.updateFileList();
-    }
-
-    handleResize() {
-        // Handle window resize events
-        if (this.pdfViewer) {
-            this.pdfViewer.handleResize();
-        }
+    downloadFile(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     formatFileSize(bytes) {
@@ -842,19 +1036,11 @@ class DocumentSearchApp {
         
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
-
-    showError(message) {
-        // Simple error display - could be enhanced with a proper notification system
-        alert(message);
-    }
-
-    showSuccess(message) {
-        // Simple success display - could be enhanced with a proper notification system
-        console.log('Success:', message);
-    }
 }
 
-// Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new DocumentSearchApp();
+// Initialize the application
+let app;
+window.addEventListener('DOMContentLoaded', () => {
+    app = new DocumentSearchApp();
+    window.app = app; // Make globally accessible
 });
